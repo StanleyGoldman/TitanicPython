@@ -1,5 +1,7 @@
 import pandas as pd
-import re
+import math
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 
 def rename_columns(df):
@@ -37,10 +39,6 @@ def extract_cabin_room(cabin):
         items.sort()
         return items
 
-
-last_name_regex = re.compile('^(.*?),\s+(.*?)\s+$')
-
-salutation_regex = re.compile('^(.*?).\s+(.*?)$')
 
 salutation_title_map = {
     "Miss": "Miss",
@@ -82,7 +80,7 @@ def extract_name_data(name):
         if paren_position == 0:
             first_name = None
         else:
-            first_name = name[:paren_position-1]
+            first_name = name[:paren_position - 1]
             name = name[paren_position:]
             name = name.strip()
 
@@ -105,11 +103,12 @@ def convert_name_data_to_series(name):
                       name_data['SpouseName'], name_data['MaidenName']])
 
 
-def load_and_clean_input(*files):
+def load_and_clean_input():
+    files = ["test.csv", "train.csv"]
     frames = list(map(lambda file: pd.read_csv(file), files))
 
     for frame in frames:
-        if not "Survived" in frame.columns:
+        if not 'Survived' in frame.columns:
             frame['Survived'] = -1
 
     data = pd.concat(frames)
@@ -129,8 +128,43 @@ def load_and_clean_input(*files):
          'Sex', 'Age', 'SiblingsSpouses', 'ParentChildren', 'PassengerClass', 'Embarked', 'Ticket', 'Fare', 'Cabin',
          'CabinFloor', 'CabinRooms']]
 
+    data.set_index('PassengerId', inplace=True)
+
     return data
 
 
+def single_factors_plot(data):
+    discrete_columns = ['Salutation', 'Title', 'Sex', 'PassengerClass', 'Embarked', 'CabinFloor']
+    row_count = math.ceil(len(discrete_columns) / 2.0)
+
+    deceased_label = 'Deceased'
+    survived_label = 'Survived'
+    unknown_label = 'Unknown'
+
+    deceased_patch = mpatches.Patch(color='C0', label=deceased_label)
+    survived_patch = mpatches.Patch(color='C1', label=survived_label)
+    unknown_patch = mpatches.Patch(color='C2', label=unknown_label)
+
+    def plot_single_factor(factor, plot_number):
+        sub = plt.subplot(row_count, 2, plot_number)
+
+        data_factor = data.groupby(['Survived', factor])['Survived'].count().unstack("Survived").fillna(0)
+        data_factor.plot(kind="bar", ax=plt.gca())
+        sub.get_legend().set_visible(False)
+        return
+
+    fig = plt.figure(figsize=(2, 6))
+    plt.figlegend([deceased_patch, survived_patch, unknown_patch], [deceased_label, survived_label, unknown_label],
+                  'upper right')
+
+    for index, column in enumerate(discrete_columns):
+        plot_single_factor(column, index + 1)
+
+    fig.tight_layout()
+    plt.show()
+    return
+
+
 if __name__ == '__main__':
-    data = load_and_clean_input("test.csv", "train.csv")
+    data = load_and_clean_input()
+    single_factors_plot(data)
