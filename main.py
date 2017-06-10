@@ -43,6 +43,7 @@ def load_and_clean_input():
         # PassengerId,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
 
         df = df.rename(columns={
+            'Survived': 'Status',
             'Pclass': 'PassengerClass',
             'SibSp': 'SiblingsSpouses',
             'Parch': 'ParentChildren',
@@ -154,7 +155,7 @@ def load_and_clean_input():
         = data.apply(lambda item: convert_name_data_to_series(item.Name), axis=1)
 
     data = data[
-        ['PassengerId', 'Survived', 'Name', 'Salutation', 'Title', 'FirstName', 'SpouseName', 'MaidenName',
+        ['PassengerId', 'Status', 'Name', 'Salutation', 'Title', 'FirstName', 'SpouseName', 'MaidenName',
          'LastName', 'Sex', 'Age', 'SiblingsSpouses', 'ParentChildren', 'PassengerClass', 'Embarked', 'Ticket', 'Fare',
          'Cabin', 'CabinFloor', 'CabinRooms']]
 
@@ -168,7 +169,7 @@ def load_data():
 
 
 def pivot_discrete(data, field):
-    return data.groupby(['Survived', field])['Survived'].count().unstack("Survived").fillna(0)
+    return data.groupby(['Status', field])['Status'].count().unstack("Status").fillna(0)
 
 
 def plot_discrete(data, field, show=True):
