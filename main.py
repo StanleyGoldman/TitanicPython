@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import os.path
 import pickle
+from sklearn.model_selection import train_test_split
+
 
 from time import gmtime, strftime
 
@@ -199,6 +201,14 @@ def plot_all_discrete(data):
         plot = plot_discrete(data, column, show=False)
         plot.savefig(f"chart_{column}.png")
     return
+
+
+def build_training_data():
+    dataset = load_data()
+    learn_dataset = dataset[dataset["Status"] != -1]
+    learn_dataset_y = learn_dataset["Status"]
+    learn_dataset_x = learn_dataset[[col for col in learn_dataset.columns if col not in ["Status"]]]
+    X_train, X_test, y_train, y_test = train_test_split(learn_dataset_x, learn_dataset_y, test_size=0.4, random_state=0)
 
 
 if __name__ == '__main__':
