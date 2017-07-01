@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import os.path
 import pickle
-from sklearn.model_selection import train_test_split
+import seaborn as sns
 
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
+from sklearn.metrics import confusion_matrix
 
 from time import gmtime, strftime
 
@@ -149,9 +153,13 @@ def load_and_clean_input():
     data = rename_columns(data)
     data.Cabin = data.Cabin.fillna("")
 
+    data['Age'].fillna(0, inplace=True)
+
     data['CabinFloor'] = data.apply(lambda item: extract_cabin_floor(item.Cabin), axis=1)
     data['CabinRooms'] = data.apply(lambda item: extract_cabin_room(item.Cabin), axis=1)
     data['Name'] = data.apply(lambda item: item.Name.replace("\"", ""), axis=1)
+    data.loc[data['Sex'] == 'male', "Sex"] = 'Male'
+    data.loc[data['Sex'] == 'female', "Sex"] = 'Female'
 
     data[['LastName', 'Salutation', 'Title', 'FirstName', 'SpouseName', 'MaidenName']] \
         = data.apply(lambda item: convert_name_data_to_series(item.Name), axis=1)
@@ -161,13 +169,27 @@ def load_and_clean_input():
          'LastName', 'Sex', 'Age', 'SiblingsSpouses', 'ParentChildren', 'PassengerClass', 'Embarked', 'Ticket', 'Fare',
          'Cabin', 'CabinFloor', 'CabinRooms']]
 
+    data['Title'] = data['Title'].astype('category')
+    data['Sex'] = data['Sex'].astype('category')
+    data['Embarked'] = data['Embarked'].astype('category')
+    data['CabinFloor'] = data['CabinFloor'].astype('category')
+
     data.set_index('PassengerId', inplace=True)
 
     return data
 
 
+def prepare_data(data):
+    prepared_data = data.select_dtypes(['int64', 'float64', 'category'])
+    prepared_data = pd.get_dummies(prepared_data, dummy_na=True)
+    return prepared_data
+
+
 def load_data():
-    return pickle_or_load("data.pickle", load_and_clean_input)
+    data = pickle_or_load("data.pickle", load_and_clean_input)
+    learn_data = data[data["Status"] != -1]
+    test_data = data[data["Status"] == -1]
+    return learn_data, test_data
 
 
 def pivot_discrete(data, field):
@@ -203,14 +225,42 @@ def plot_all_discrete(data):
     return
 
 
-def build_training_data():
-    dataset = load_data()
-    learn_dataset = dataset[dataset["Status"] != -1]
-    learn_dataset_y = learn_dataset["Status"]
-    learn_dataset_x = learn_dataset[[col for col in learn_dataset.columns if col not in ["Status"]]]
-    X_train, X_test, y_train, y_test = train_test_split(learn_dataset_x, learn_dataset_y, test_size=0.4, random_state=0)
+def eval_result_set(y_data):
+    total = len(y_data)
+    survived = len(y_data[y_data == 1])
+    survived_pct = survived / total
+    print(f"Total: {total} Total Survived: {survived} Pct:P{survived_pct:.3f}")
+
+
+def build_training_data(learn_data):
+    learn_dataset_y = learn_data["Status"].values
+    learn_dataset_x = learn_data[[col for col in learn_data.columns if col not in ["Status"]]]
+    return train_test_split(learn_dataset_x, learn_dataset_y, test_size=0.4, random_state=0)
+
+
+def run_decision_tree_classifier(max_leaf_nodes, x_train, y_train, x_test, y_test):
+
+    classifier = DecisionTreeClassifier(criterion='entropy', random_state=0, max_leaf_nodes=max_leaf_nodes)
+    classifier.fit(x_train, y_train)
+    y_pred = classifier.predict(x_test)
+
+    cm = confusion_matrix(y_test, y_pred)
+    pct_correct = (cm[0, 0] + cm[1,1]) / sum(sum(cm))
+
+    print(f"MaxLeafNodes: {max_leaf_nodes} Pct:{pct_correct:.2f}")
+
+    return [max_leaf_nodes, pct_correct]
 
 
 if __name__ == '__main__':
-    data = load_data()
-    plot_all_discrete(data)
+
+    learn_data, official_test_data = load_data()
+    prepared_learn_data = prepare_data(learn_data)
+
+    x_train, x_test, y_train, y_test = build_training_data(prepared_learn_data)
+
+    data = list(map(lambda x: run_decision_tree_classifier(x, x_train, y_train, x_test, y_test), range(2,100)))
+
+    # dotfile = open("dtree.dot", 'w')
+    # tree.export_graphviz(classifier, out_file=dotfile, feature_names=x_train.columns)
+    # dotfile.close()
